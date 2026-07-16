@@ -3,32 +3,73 @@ name: NotebookLM Podcast
 on:
   workflow_dispatch:
 
+  schedule:
+    # 07:00 МСК = 04:00 UTC
+    - cron: "0 4 * * *"
+
+
 jobs:
 
-  test:
+  podcast:
 
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write
+
+
     steps:
 
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - run: |
+
+      - name: Install dependencies
+        run: |
           python -V
           pip install -r requirements.txt
 
+
+      # ВАЖНО: восстанавливаем NotebookLM login
       - name: Restore NotebookLM session
         run: |
           mkdir -p ~/.notebooklm/profiles/default
-          echo "${{ secrets.NOTEBOOKLM_STORAGE_STATE }}" | base64 -d > ~/.notebooklm/profiles/default/storage_state.json
+
+          echo "${{ secrets.NOTEBOOKLM_STORAGE_STATE }}" \
+            | base64 -d \
+            > ~/.notebooklm/profiles/default/storage_state.json
+
+
+      - name: Check NotebookLM auth
+        run: |
+          notebooklm doctor
+
 
       - name: Generate podcast
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python -u main.py
+          python -u collect_posts.py
+
+
+      # сохраняем новый last_processed_id
+      - name: Commit state update
+        run: |
+
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          git add data/state.json
+
+          git diff --cached --quiet || \
+            git commit -m "Update podcast state"
+
+          git push
