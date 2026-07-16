@@ -21,6 +21,12 @@ jobs:
           python -V
           pip install -r requirements.txt
 
-      - name: NotebookLM CLI
+      - name: Restore NotebookLM session
         run: |
-          notebooklm --help      
+          mkdir -p ~/.notebooklm/profiles/default
+          echo "${{ secrets.NOTEBOOKLM_STORAGE_STATE }}" | base64 -d > ~/.notebooklm/profiles/default/storage_state.json
+
+      - name: Check NotebookLM
+        run: |
+          notebooklm doctor
+          notebooklm list
