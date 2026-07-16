@@ -44,6 +44,32 @@ def save_json(path, data):
     )
 
 
+def is_content_post(post):
+
+     text = post["text"].strip()
+
+    # слишком короткие сообщения
+    if len(text) < 200:
+        return False
+
+
+    # приветствие канала
+    skip_patterns = [
+        "Вступайте в ряды Фурье!",
+        "То, что вы пропустили про современную науку",
+        "Канал ведут",
+        "По сотрудничеству"
+    ]
+
+
+    for pattern in skip_patterns:
+
+        if pattern in text:
+            return False
+
+
+    return True
+
 def get_post(channel, post_id):
 
     url = f"https://t.me/{channel}/{post_id}"
@@ -80,7 +106,7 @@ def get_post(channel, post_id):
     ).strip()
 
 
-    if len(text) < 200:
+    if not is_content_post(soup):
         return None
 
 
@@ -110,7 +136,7 @@ def find_next_post(channel, last_id):
             post_id
         )
 
-        if post:
+        if post and is_content_post(post):
             return post
 
 
