@@ -93,12 +93,30 @@ print("Audio URL:", audio_url, flush=True)
 
 audio_file = "/tmp/podcast.mp3"
 
-r = requests.get(audio_url)
+r = requests.get(
+    audio_url,
+    headers={
+        "User-Agent": "Mozilla/5.0"
+    },
+    allow_redirects=True
+)
+
+print("Download status:", r.status_code, flush=True)
+print("Content-Type:", r.headers.get("content-type"), flush=True)
+print("Content-Length header:", r.headers.get("content-length"), flush=True)
+print("Downloaded bytes:", len(r.content), flush=True)
 
 r.raise_for_status()
 
 with open(audio_file, "wb") as f:
     f.write(r.content)
+
+print(
+    "Saved file size:",
+    os.path.getsize(audio_file),
+    "bytes",
+    flush=True
+)
 
 
 print("Downloaded:", audio_file, flush=True)
@@ -111,6 +129,12 @@ chat_id = os.environ["TELEGRAM_CHAT_ID"]
 
 
 with open(audio_file, "rb") as f:
+
+	print(
+	    "Before Telegram size:",
+	    os.path.getsize(audio_file),
+	    flush=True
+	)
 
     response = requests.post(
         f"https://api.telegram.org/bot{token}/sendAudio",
