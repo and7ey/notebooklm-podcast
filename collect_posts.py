@@ -46,7 +46,7 @@ def save_json(path, data):
 
 def is_content_post(post):
 
-     text = post["text"].strip()
+    text = post["text"].strip()
 
     # слишком короткие сообщения
     if len(text) < 200:
