@@ -1,11 +1,12 @@
 import subprocess
 import json
+import requests
 import os
 import tempfile
 
 
 def run(cmd):
-    print("\n$", " ".join(str(x) for x in cmd))
+    print("\n$", " ".join(str(x) for x in cmd), flush=True)
 
     result = subprocess.run(
         cmd,
@@ -15,27 +16,28 @@ def run(cmd):
     )
 
     if result.stdout:
-        print(result.stdout)
+        print(result.stdout, flush=True)
 
     if result.stderr:
-        print(result.stderr)
+        print(result.stderr, flush=True)
 
     return result.stdout
 
 
-# Тестовый текст
-text = """
-Объясни основные события дня в формате подкаста.
-Это тест автоматической генерации аудио через NotebookLM
-из GitHub Actions.
+TEXT = """
+Это тест автоматической генерации подкаста.
+
+NotebookLM создал этот аудиофайл
+через GitHub Actions.
 """
 
 
-# 1. Создаем временный notebook
+# Создаем notebook
+
 output = run([
     "notebooklm",
     "create",
-    "GitHub Podcast Test",
+    "Temporary Podcast",
     "--json"
 ])
 
@@ -43,30 +45,32 @@ data = json.loads(output)
 
 notebook_id = data["notebook"]["id"]
 
-print("Notebook ID:", notebook_id)
+print("Notebook:", notebook_id, flush=True)
 
 
-# 2. Добавляем текстовый источник
+# Добавляем текст
+
 run([
     "notebooklm",
     "source",
     "add",
-    text,
+    TEXT,
     "--type",
     "text",
     "--title",
-    "Input text",
+    "Source",
     "-n",
     notebook_id
 ])
 
 
-# 3. Генерируем аудио
-run([
+# Генерируем аудио
+
+output = run([
     "notebooklm",
     "generate",
     "audio",
-    "Сделай спокойный информационный подкаст на русском языке",
+    "Сделай спокойный подкаст на русском языке",
     "-n",
     notebook_id,
     "--language",
@@ -78,3 +82,48 @@ run([
     "--wait",
     "--json"
 ])
+
+
+audio_url = json.loads(output)["url"]
+
+print("Audio URL:", audio_url, flush=True)
+
+
+# Скачиваем mp3
+
+audio_file = "/tmp/podcast.mp3"
+
+r = requests.get(audio_url)
+
+r.raise_for_status()
+
+with open(audio_file, "wb") as f:
+    f.write(r.content)
+
+
+print("Downloaded:", audio_file, flush=True)
+
+
+# Отправляем Telegram
+
+token = os.environ["TELEGRAM_BOT_TOKEN"]
+chat_id = os.environ["TELEGRAM_CHAT_ID"]
+
+
+with open(audio_file, "rb") as f:
+
+    response = requests.post(
+        f"https://api.telegram.org/bot{token}/sendAudio",
+        data={
+            "chat_id": chat_id,
+            "title": "NotebookLM Podcast"
+        },
+        files={
+            "audio": f
+        }
+    )
+
+
+response.raise_for_status()
+
+print("Sent to Telegram", flush=True)

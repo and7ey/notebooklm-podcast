@@ -27,5 +27,8 @@ jobs:
           echo "${{ secrets.NOTEBOOKLM_STORAGE_STATE }}" | base64 -d > ~/.notebooklm/profiles/default/storage_state.json
 
       - name: Generate podcast
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python main.py
+          python -u main.py
