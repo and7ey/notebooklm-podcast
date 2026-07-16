@@ -26,6 +26,6 @@ jobs:
           mkdir -p ~/.notebooklm/profiles/default
           echo "${{ secrets.NOTEBOOKLM_STORAGE_STATE }}" | base64 -d > ~/.notebooklm/profiles/default/storage_state.json
 
-      - name: Generate test podcast
+      - name: Generate podcast
         run: |
-          notebooklm create "GitHub Podcast Test"
+          python main.py
