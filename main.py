@@ -5,7 +5,7 @@ import tempfile
 
 
 def run(cmd):
-    print("\n$", " ".join(cmd))
+    print("\n$", " ".join(str(x) for x in cmd))
 
     result = subprocess.run(
         cmd,
@@ -39,12 +39,9 @@ output = run([
     "--json"
 ])
 
-notebook = json.loads(output)
+data = json.loads(output)
 
-notebook_id = (
-    notebook.get("id")
-    or notebook.get("notebook_id")
-)
+notebook_id = data["notebook"]["id"]
 
 print("Notebook ID:", notebook_id)
 
