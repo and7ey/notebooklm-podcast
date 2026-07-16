@@ -90,20 +90,24 @@ def get_post(channel, post_id):
     )
 
 
-    description = soup.find(
-        "meta",
-        property="og:description"
+    message = soup.find(
+        "div",
+        class_="tgme_widget_message_text"
     )
 
 
-    if not description:
+    if not message:
         return None
 
 
-    text = description.get(
-        "content",
-        ""
-    ).strip()
+    text = message.get_text(
+        "\n",
+        strip=True
+    )
+
+
+    if not text:
+        return None
 
 
     return {
