@@ -11,8 +11,7 @@ def run(cmd):
     result = subprocess.run(
         cmd,
         text=True,
-        capture_output=True,
-        check=True
+        capture_output=True
     )
 
     if result.stdout:
@@ -20,6 +19,11 @@ def run(cmd):
 
     if result.stderr:
         print(result.stderr, flush=True)
+
+    if result.returncode != 0:
+        raise Exception(
+            f"Command failed with code {result.returncode}"
+        )
 
     return result.stdout
 
