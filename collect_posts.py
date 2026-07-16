@@ -48,6 +48,8 @@ def is_content_post(post):
 
     text = post["text"].strip()
 
+    print(text)
+
     # слишком короткие сообщения
     if len(text) < 200:
         return False
@@ -72,7 +74,8 @@ def is_content_post(post):
 
 def get_post(channel, post_id):
 
-    url = f"https://t.me/{channel}/{post_id}"
+    url = f"https://t.me/{channel}/{post_id}?embed=1&mode=tme"
+
 
     r = requests.get(
         url,
@@ -83,11 +86,12 @@ def get_post(channel, post_id):
     if r.status_code != 200:
         return None
 
-
     soup = BeautifulSoup(
         r.text,
         "html.parser"
     )
+
+    
 
 
     message = soup.find(
