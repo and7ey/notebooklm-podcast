@@ -106,10 +106,6 @@ def get_post(channel, post_id):
     ).strip()
 
 
-    if not is_content_post(soup):
-        return None
-
-
     return {
         "id": post_id,
         "url": url,
@@ -141,7 +137,6 @@ def find_next_post(channel, last_id):
 
 
     return None
-
 
 
 def run_command(cmd):
