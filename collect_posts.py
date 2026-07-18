@@ -186,7 +186,6 @@ def run_command(cmd):
     return result.stdout
 
 
-
 def generate_podcast(post):
 
     notebook = run_command([
@@ -196,18 +195,9 @@ def generate_podcast(post):
         "--json"
     ])
 
+    notebook_json = json.loads(notebook)
 
-    notebook_json = json.loads(
-        notebook
-    )
-
-
-    notebook_id = notebook_json[
-        "notebook"
-    ][
-        "id"
-    ]
-
+    notebook_id = notebook_json["notebook"]["id"]
 
     run_command([
         "notebooklm",
@@ -222,8 +212,7 @@ def generate_podcast(post):
         notebook_id
     ])
 
-
-    audio_result = run_command([
+    run_command([
         "notebooklm",
         "generate",
         "audio",
@@ -240,48 +229,47 @@ def generate_podcast(post):
         "--json"
     ])
 
+    filename = f"/tmp/podcast-{post['id']}.mp3"
 
-    return json.loads(
-        audio_result
-    )["url"]
-
-
-
-def send_to_telegram(audio_url):
-
-    audio = requests.get(
-        audio_url,
-        timeout=60
-    )
-
-
-    audio.raise_for_status()
-
-
-    filename = "/tmp/podcast.mp3"
-
-
-    Path(filename).write_bytes(
-        audio.content
-    )
-
-
-    with open(
+    run_command([
+        "notebooklm",
+        "download",
+        "audio",
         filename,
-        "rb"
-    ) as f:
+        "-n",
+        notebook_id
+    ])
+
+    size = Path(filename).stat().st_size
+
+    print(f"Downloaded {filename}")
+    print(f"Size: {size:,} bytes")
+
+    if size < 100_000:
+        raise Exception("Downloaded audio is suspiciously small")
+
+    return filename
+
+
+def send_to_telegram(filename, post):
+
+    with open(filename, "rb") as f:
 
         r = requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendAudio",
             data={
-                "chat_id": TELEGRAM_CHAT_ID
+                "chat_id": TELEGRAM_CHAT_ID,
+                "caption": f"🎙 Ряды Фурье #{post['id']}\n{post['url']}"
             },
             files={
-                "audio": f
+                "audio": (
+                    Path(filename).name,
+                    f,
+                    "audio/mpeg"
+                )
             },
-            timeout=120
+            timeout=300
         )
-
 
     r.raise_for_status()
 
@@ -333,14 +321,9 @@ def main():
 
     # пока state НЕ меняем
 
-    audio_url = generate_podcast(
-        post
-    )
+    filename = generate_podcast(post)
 
-
-    send_to_telegram(
-        audio_url
-    )
+    send_to_telegram(filename, post)
 
 
     # только после успеха
