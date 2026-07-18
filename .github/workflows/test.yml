@@ -1,0 +1,37 @@
+name: Download Audio Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+
+  test:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: |
+          pip install -r requirements.txt
+
+      - name: Restore NotebookLM session
+        run: |
+          mkdir -p ~/.notebooklm/profiles/default
+          echo "${{ secrets.NOTEBOOKLM_STORAGE_STATE }}" | base64 -d \
+            > ~/.notebooklm/profiles/default/storage_state.json
+
+      - name: Download latest audio
+        run: |
+          notebooklm download audio podcast.mp3 \
+            -n 9f9b4573-c60f-4fe4-a517-c3b0b8797758
+
+      - name: Show file
+        run: |
+          ls -lh
+          file podcast.mp3
