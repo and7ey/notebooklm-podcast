@@ -5,7 +5,7 @@ on:
 
   schedule:
     # 07:00 МСК = 04:00 UTC
-    - cron: "0 4 * * *"
+    - cron: "0 2 * * *"
 
 
 jobs:
