@@ -2,6 +2,7 @@ import json
 import subprocess
 import requests
 import os
+import re
 from pathlib import Path
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
@@ -257,7 +258,7 @@ def generate_podcast(post):
         "--json"
     ])
 
-    filename = f"/tmp/podcast-{post['id']}.mp3"
+    filename = f"/tmp/podcast-{post['id']}.m4a"
 
     run_command([
         "notebooklm",
@@ -270,11 +271,29 @@ def generate_podcast(post):
 
     size = Path(filename).stat().st_size
 
+    m = re.search(r"Artifact:\s*(.*?)\s*\(only artifact\)", output)
+    title = m.group(1) if m else f"Ряды Фурье #{post['id']}"
+
     print(f"Downloaded {filename}")
     print(f"Size: {size:,} bytes")
 
     if size < 100_000:
         raise Exception("Downloaded audio is suspiciously small")
+
+    tagged = filename.replace(".m4a", "-tagged.m4a")
+
+    run_command([
+        "ffmpeg",
+        "-y",
+        "-i", filename,
+        "-c", "copy",
+        "-metadata", "artist=Ряды Фурье",
+        "-metadata", f"title={title}",
+        "-metadata", "album=Подкасты NotebookLM",
+        tagged
+    ])
+
+    filename = tagged        
 
     return filename
 
@@ -293,7 +312,7 @@ def send_to_telegram(filename, post):
                 "audio": (
                     Path(filename).name,
                     f,
-                    "audio/mpeg"
+                    "audio/mp4"
                 )
             },
             timeout=300
