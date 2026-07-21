@@ -258,7 +258,7 @@ def generate_podcast(post):
         "--json"
     ])
 
-    filename = f"/tmp/podcast-{post['id']}.m4a"
+    filename = f"/tmp/podcast-{post['id']}-notags.m4a"
 
     run_command([
         "notebooklm",
@@ -280,7 +280,7 @@ def generate_podcast(post):
     if size < 100_000:
         raise Exception("Downloaded audio is suspiciously small")
 
-    tagged = filename.replace(".m4a", "-tagged.m4a")
+    tagged = filename.replace("-notags.m4a", ".m4a")
 
     run_command([
         "ffmpeg",
