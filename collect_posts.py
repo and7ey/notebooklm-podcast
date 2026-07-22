@@ -295,10 +295,10 @@ def generate_podcast(post):
 
     filename = tagged        
 
-    return filename
+    return filename, title
 
 
-def send_to_telegram(filename, post):
+def send_to_telegram(filename, title, post):
 
     with open(filename, "rb") as f:
 
@@ -306,7 +306,9 @@ def send_to_telegram(filename, post):
             f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendAudio",
             data={
                 "chat_id": TELEGRAM_CHAT_ID,
-                "caption": f"🎙 Ряды Фурье #{post['id']}\n{post['url']}"
+                "caption": f"🎙 Ряды Фурье #{post['id']}\n{post['url']}",
+                "title": title,
+                "performer": "Ряды Фурье"
             },
             files={
                 "audio": (
@@ -368,9 +370,9 @@ def main():
 
     # пока state НЕ меняем
 
-    filename = generate_podcast(post)
+    filename, title = generate_podcast(post)
 
-    send_to_telegram(filename, post)
+    send_to_telegram(filename, title, post)
 
 
     # только после успеха
