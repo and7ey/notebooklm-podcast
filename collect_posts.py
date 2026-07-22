@@ -260,7 +260,7 @@ def generate_podcast(post):
 
     filename = f"/tmp/podcast-{post['id']}-notags.m4a"
 
-    run_command([
+    output = run_command([
         "notebooklm",
         "download",
         "audio",
