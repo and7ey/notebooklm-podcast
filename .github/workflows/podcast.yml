@@ -36,6 +36,11 @@ jobs:
           python -V
           pip install -r requirements.txt
 
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg          
+
 
       # ВАЖНО: восстанавливаем NotebookLM login
       - name: Restore NotebookLM session
