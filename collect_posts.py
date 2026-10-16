@@ -14,6 +14,7 @@ STATE_FILE = Path("data/state.json")
 
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
+TELEGRAM_THREAD_ID = "3"
 
 
 HEADERS = {
@@ -245,7 +246,7 @@ def generate_podcast(post):
         "notebooklm",
         "generate",
         "audio",
-        "Сделай спокойный информационный подкаст на русском языке, перепроверь правильность ударений. В начале подкаста добавь приветствие.",
+        "Сделай информационный подкаст на русском языке, перепроверь правильность ударений. В начале подкаста добавь приветствие.",
         "-n",
         notebook_id,
         "--language",
@@ -308,7 +309,8 @@ def send_to_telegram(filename, title, post):
                 "chat_id": TELEGRAM_CHAT_ID,
                 "caption": f"🎙 Ряды Фурье #{post['id']}\n{post['url']}",
                 "title": title,
-                "performer": "Ряды Фурье"
+                "performer": "Ряды Фурье",
+                "message_thread_id": TELEGRAM_THREAD_ID
             },
             files={
                 "audio": (
