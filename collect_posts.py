@@ -1,3 +1,4 @@
+import hashlib
 import json
 import subprocess
 import requests
@@ -13,7 +14,7 @@ STATE_FILE = Path("data/state.json")
 
 
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-TELEGRAM_CHAT_ID = "-1003960308699" # os.environ["TELEGRAM_CHAT_ID"]
+TELEGRAM_CHAT_ID = "-1003960308699"  # os.environ["TELEGRAM_CHAT_ID"]
 TELEGRAM_THREAD_ID = "3"
 
 
@@ -46,8 +47,16 @@ def save_json(path, data):
     )
 
 
-def is_content_post(post):
+def get_text_hash(text):
+    # Различия в пробелах и переносах не считаем новым содержимым.
+    normalized = " ".join(text.split())
 
+    return hashlib.sha256(
+        normalized.encode("utf-8")
+    ).hexdigest()
+
+
+def is_content_post(post):
     text = post["text"].strip()
 
     print("=" * 80)
@@ -56,22 +65,18 @@ def is_content_post(post):
     print(text)
     print("=" * 80)
 
-    # пустой пост
-    if not text:
-        return False
-
-    # слишком короткий
+    # Пустой или слишком короткий пост.
     if len(text) < 200:
         return False
 
-    # настоящий приветственный пост канала
+    # Настоящий приветственный пост канала.
     if text.startswith("Вступайте в ряды Фурье!"):
         return False
 
     return True
 
-def get_post(channel, post_id):
 
+def get_post(channel, post_id):
     url = f"https://t.me/{channel}/{post_id}?embed=1&mode=tme"
 
     r = requests.get(
@@ -104,16 +109,7 @@ def get_post(channel, post_id):
     if not text:
         return None
 
-    # ------------------------------------------------------------------
-    # Telegram автоматически добавляет в embed рекламный блок:
-    #
-    # --
-    # Вступайте в ряды Фурье!
-    # Лучшие посты...
-    #
-    # Он не относится к самому посту.
-    # ------------------------------------------------------------------
-
+    # Удаляем хвост, если он присутствует в извлечённом тексте.
     marker = "\n--\nВступайте в ряды Фурье!"
 
     if marker in text:
@@ -126,39 +122,13 @@ def get_post(channel, post_id):
     }
 
 
-def is_content_post(post):
-
-    text = post["text"].strip()
-
-    print("=" * 80)
-    print(f"POST {post['id']}")
-    print("=" * 80)
-    print(text)
-    print("=" * 80)
-
-    # пустой пост
-    if not text:
-        return False
-
-    # слишком короткий
-    if len(text) < 200:
-        return False
-
-    # настоящий приветственный пост канала
-    if text.startswith("Вступайте в ряды Фурье!"):
-        return False
-
-    return True
-
-
-
-def find_next_post(channel, last_id):
+def find_next_post(channel, last_id, processed_hashes):
+    last_skipped_id = last_id
 
     for post_id in range(
         last_id + 1,
         last_id + 7
     ):
-
         print(
             "Checking",
             post_id,
@@ -170,21 +140,33 @@ def find_next_post(channel, last_id):
             post_id
         )
 
-        if post and is_content_post(post):
-            return post
+        if not post or not is_content_post(post):
+            continue
 
+        text_hash = get_text_hash(post["text"])
 
-    return None
+        if text_hash in processed_hashes:
+            print(
+                f"Skipping duplicate text: post {post_id}",
+                flush=True
+            )
+
+            last_skipped_id = post_id
+            continue
+
+        post["text_hash"] = text_hash
+
+        return post, last_skipped_id
+
+    return None, last_skipped_id
 
 
 def run_command(cmd):
-
     print(
         "$",
         " ".join(cmd),
         flush=True
     )
-
 
     result = subprocess.run(
         cmd,
@@ -192,13 +174,11 @@ def run_command(cmd):
         capture_output=True
     )
 
-
     if result.stdout:
         print(
             result.stdout,
             flush=True
         )
-
 
     if result.stderr:
         print(
@@ -206,18 +186,15 @@ def run_command(cmd):
             flush=True
         )
 
-
     if result.returncode != 0:
         raise Exception(
             f"Command failed: {cmd}"
         )
 
-
     return result.stdout
 
 
 def generate_podcast(post):
-
     notebook = run_command([
         "notebooklm",
         "create",
@@ -246,7 +223,11 @@ def generate_podcast(post):
         "notebooklm",
         "generate",
         "audio",
-        "Сделай информационный подкаст на русском языке, перепроверь правильность ударений. В начале подкаста добавь приветствие.",
+        (
+            "Сделай информационный подкаст на русском языке, "
+            "перепроверь правильность ударений. "
+            "В начале подкаста добавь приветствие."
+        ),
         "-n",
         notebook_id,
         "--language",
@@ -272,42 +253,61 @@ def generate_podcast(post):
 
     size = Path(filename).stat().st_size
 
-    m = re.search(r"Artifact:\s*(.*?)\s*\(only artifact\)", output)
-    title = m.group(1) if m else f"Ряды Фурье #{post['id']}"
+    m = re.search(
+        r"Artifact:\s*(.*?)\s*\(only artifact\)",
+        output
+    )
+
+    title = (
+        m.group(1)
+        if m
+        else f"Ряды Фурье #{post['id']}"
+    )
 
     print(f"Downloaded {filename}")
     print(f"Size: {size:,} bytes")
 
     if size < 100_000:
-        raise Exception("Downloaded audio is suspiciously small")
+        raise Exception(
+            "Downloaded audio is suspiciously small"
+        )
 
-    tagged = filename.replace("-notags.m4a", ".m4a")
+    tagged = filename.replace(
+        "-notags.m4a",
+        ".m4a"
+    )
 
     run_command([
         "ffmpeg",
         "-y",
-        "-i", filename,
-        "-c", "copy",
-        "-metadata", "artist=Ряды Фурье",
-        "-metadata", f"title={title}",
-        "-metadata", "album=Подкасты NotebookLM",
+        "-i",
+        filename,
+        "-c",
+        "copy",
+        "-metadata",
+        "artist=Ряды Фурье",
+        "-metadata",
+        f"title={title}",
+        "-metadata",
+        "album=Подкасты NotebookLM",
         tagged
     ])
 
-    filename = tagged        
+    filename = tagged
 
-    return filename, title
+    return filename, title, notebook_id
 
 
 def send_to_telegram(filename, title, post):
-
     with open(filename, "rb") as f:
-
         r = requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendAudio",
             data={
                 "chat_id": TELEGRAM_CHAT_ID,
-                "caption": f"🎙 Ряды Фурье #{post['id']}\n{post['url']}",
+                "caption": (
+                    f"🎙 Ряды Фурье #{post['id']}\n"
+                    f"{post['url']}"
+                ),
                 "title": title,
                 "performer": "Ряды Фурье",
                 "message_thread_id": TELEGRAM_THREAD_ID
@@ -325,81 +325,98 @@ def send_to_telegram(filename, title, post):
     r.raise_for_status()
 
 
-
 def main():
+    config = load_json(CONFIG_FILE)
+    state = load_json(STATE_FILE)
 
-    config = load_json(
-        CONFIG_FILE
+    channel = config["channels"][0]["name"]
+    channel_state = state[channel]
+
+    last_id = channel_state["last_processed_id"]
+
+    processed_hashes = set(
+        channel_state.get(
+            "processed_text_hashes",
+            []
+        )
     )
 
-    state = load_json(
-        STATE_FILE
-    )
-
-
-    channel = config[
-        "channels"
-    ][0][
-        "name"
-    ]
-
-
-    last_id = state[channel][
-        "last_processed_id"
-    ]
-
-
-    post = find_next_post(
+    post, last_skipped_id = find_next_post(
         channel,
-        last_id
+        last_id,
+        processed_hashes
     )
-
 
     if not post:
+        # Сохраняем продвижение по найденным дублям,
+        # даже если нового текста в окне поиска нет.
+        if last_skipped_id > last_id:
+            channel_state["last_processed_id"] = last_skipped_id
 
-        print(
-            "No new posts"
-        )
+            channel_state["last_run"] = datetime.now(
+                timezone.utc
+            ).isoformat()
 
+            save_json(
+                STATE_FILE,
+                state
+            )
+
+        print("No new posts")
         return
-
 
     print(
         "Found post",
         post["id"]
     )
 
+    # До успешной отправки новый текст не отмечаем обработанным.
+    filename, title, notebook_id = generate_podcast(post)
 
-    # пока state НЕ меняем
+    send_to_telegram(
+        filename,
+        title,
+        post
+    )
 
-    filename, title = generate_podcast(post)
+    # Только после успешной отправки сохраняем ID и хеш текста.
+    processed_hashes.add(
+        post["text_hash"]
+    )
 
-    send_to_telegram(filename, title, post)
+    channel_state["last_processed_id"] = post["id"]
 
+    channel_state["processed_text_hashes"] = sorted(
+        processed_hashes
+    )
 
-    # только после успеха
-
-    state[channel][
-        "last_processed_id"
-    ] = post["id"]
-
-
-    state[channel][
-        "last_run"
-    ] = datetime.now(
+    channel_state["last_run"] = datetime.now(
         timezone.utc
     ).isoformat()
-
 
     save_json(
         STATE_FILE,
         state
     )
 
+    # Ошибка удаления notebook не должна помешать workflow
+    # закоммитить state уже отправленного подкаста.
+    try:
+        run_command([
+            "notebooklm",
+            "delete",
+            "-n",
+            notebook_id,
+            "-y"
+        ])
+    except Exception as exc:
+        print(
+            f"WARNING: podcast sent and state saved, "
+            f"but notebook {notebook_id} could not be deleted: {exc}",
+            flush=True
+        )
 
-    print(
-        "Completed successfully"
-    )
+    print("Completed successfully")
 
 
 if __name__ == "__main__":
