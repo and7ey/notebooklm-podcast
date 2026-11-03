@@ -306,6 +306,7 @@ def send_to_telegram(filename, title, post):
                 "chat_id": TELEGRAM_CHAT_ID,
                 "caption": (
                     f"🎙 Ряды Фурье #{post['id']}\n"
+                    f"{title}"
                     f"{post['url']}"
                 ),
                 "title": title,
