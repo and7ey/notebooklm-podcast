@@ -12,6 +12,9 @@ from datetime import datetime, timezone
 CONFIG_FILE = Path("config.json")
 STATE_FILE = Path("data/state.json")
 
+# Сколько постов после last_processed_id просматривать за один прогон.
+SEARCH_WINDOW = 30
+
 
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = "-1003960308699"  # os.environ["TELEGRAM_CHAT_ID"]
@@ -86,7 +89,11 @@ def get_post(channel, post_id):
     )
 
     if r.status_code != 200:
-        return None
+        # Ошибку сети/лимитов нельзя путать с «поста нет»: иначе
+        # указатель уедет вперёд и реальные посты потеряются.
+        raise Exception(
+            f"Failed to fetch post {post_id}: HTTP {r.status_code}"
+        )
 
     soup = BeautifulSoup(
         r.text,
@@ -127,7 +134,7 @@ def find_next_post(channel, last_id, processed_hashes):
 
     for post_id in range(
         last_id + 1,
-        last_id + 7
+        last_id + 1 + SEARCH_WINDOW
     ):
         print(
             "Checking",
@@ -141,6 +148,10 @@ def find_next_post(channel, last_id, processed_hashes):
         )
 
         if not post or not is_content_post(post):
+            # Короткие/пустые посты и приветствие подкастом не считаются,
+            # но указатель на них двигаем. Иначе окно поиска навсегда
+            # застревает на серии таких постов (см. посты 952-961).
+            last_skipped_id = post_id
             continue
 
         text_hash = get_text_hash(post["text"])
@@ -349,8 +360,8 @@ def main():
     )
 
     if not post:
-        # Сохраняем продвижение по найденным дублям,
-        # даже если нового текста в окне поиска нет.
+        # Сохраняем продвижение по пропущенным постам (короткие, пустые,
+        # приветствие, дубли), даже если нового текста в окне поиска нет.
         if last_skipped_id > last_id:
             channel_state["last_processed_id"] = last_skipped_id
 
